@@ -3,7 +3,6 @@ from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
-from .validators import validate_year
 
 class User(AbstractUser):
     USER = 'user'
@@ -19,10 +18,47 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=USER)
     bio = models.TextField(blank=True)
+    is_staff = models.CharField(null=True, max_length=256)
+
+
+class Categories(models.Model):
+    name = models.CharField(max_length=256)
+    slug = models.SlugField(unique=True, max_length=50)
+
+    class Meta:
+        verbose_name = 'Категория'
+        verbose_name_plural = 'Категории'
+
+
+class Genre(models.Model):
+    name = models.CharField(max_length=256)
+    slug = models.SlugField(unique=True, max_length=50)
+
+    class Meta:
+        verbose_name = 'Жанр'
+        verbose_name_plural = 'Жанры'
+
+
+class Title(models.Model):
+    name = models.TextField(verbose_name='Название', max_length=256)
+    year = models.DateField(verbose_name='Год выпуска')
+    description = models.TextField(verbose_name='Описание', max_length=256,
+                                   null=True)
+    genre = models.ManyToManyField(Genre, through='GenreTitle')
+    category = models.ForeignKey(Categories, related_name='title',
+                                 on_delete=models.SET_NULL, null=True)
+
+    class Meta:
+        verbose_name = 'Произведение'
+        verbose_name_plural = 'Произведения'
 
 
 class Review(models.Model):
+    title = models.ForeignKey(Title, on_delete=models.CASCADE,
+                              related_name='reviews')
     text = models.TextField(verbose_name='Текст')
+    author = models.ForeignKey(User, on_delete=models.CASCADE,
+                               related_name='reviews')
     score = models.PositiveSmallIntegerField(
         verbose_name='Оценка',
         validators=[
@@ -30,13 +66,9 @@ class Review(models.Model):
             MaxValueValidator(10, 'Оценка не может быть выше 10')
         ]
     )
-    author = models.ForeignKey(User, on_delete=models.CASCADE,
-                               related_name='reviews')
     pub_date = models.DateTimeField(verbose_name='Дата публикации',
                                     auto_now_add=True,
                                     db_index=True)
-    title = models.ForeignKey(Title, on_delete=models.CASCADE,
-                              related_name='reviews')
 
     class Meta:
         verbose_name = 'Отзыв'
@@ -72,3 +104,9 @@ class Comment(models.Model):
         return f'{self.author}, {self.pub_date}: {self.text}'
 
 
+class GenreTitle(models.Model):
+    genre = models.ForeignKey(Genre, on_delete=models.CASCADE)
+    title = models.ForeignKey(Title, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f'{self.genre} {self.title}'
