@@ -10,12 +10,14 @@ from rest_framework.permissions import (AllowAny, IsAuthenticated,
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework_simplejwt.tokens import AccessToken
-from reviews.models import Review, Title
+from reviews.models import Review, Title, Categories
 
-from .permissions import (IsAdmin, IsAuthorAdminModeratorOrReadOnly)
+from .permissions import (IsAdmin, IsAuthorAdminModeratorOrReadOnly,
+                          IsAdminOrReadOnly)
 from .serializers import (ConfirmationCodeSerializer, UserCreationSerializer,
                           UserSerializer, ConfirmationCodeSerializer,
-                          MeSerializer, CommentSerializer, ReviewSerializer)
+                          MeSerializer, CommentSerializer, ReviewSerializer,
+                          CategoriesSerializer)
 
 User = get_user_model()
 
@@ -23,25 +25,39 @@ User = get_user_model()
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def send_confirmation_code(request):
+
     serializer = UserCreationSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
+    email = serializer.initial_data['email']
+    username = serializer.initial_data['username']
+    user = User.objects.get(email=email, username=username)
+    if user is not None:
+        confirmation_code = default_token_generator.make_token(user)
 
-    email = serializer.data['email']
-    username = serializer.data['username']
+        send_mail(
+            'Код подтверждения',
+            f'Ваш код подтверждения: {confirmation_code}',
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=False
+        )
+        return Response(serializer.initial_data, status=status.HTTP_200_OK)
+    else:
+        serializer.is_valid(raise_exception=True)
+        email = serializer.data['email']
+        username = serializer.data['username']
+        user, created = User.objects.get_or_create(email=email, username=username)
 
-    user, created = User.objects.get_or_create(email=email, username=username)
+        confirmation_code = default_token_generator.make_token(user)
 
-    confirmation_code = default_token_generator.make_token(user)
+        send_mail(
+            'Код подтверждения',
+            f'Ваш код подтверждения: {confirmation_code}',
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=False
+        )
 
-    send_mail(
-        'Код подтверждения',
-        f'Ваш код подтверждения: {confirmation_code}',
-        settings.DEFAULT_FROM_EMAIL,
-        [email],
-        fail_silently=False
-    )
-
-    return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -127,3 +143,25 @@ class CommentViewSet(ModelViewSet):
         review = get_object_or_404(Review, id=self.kwargs.get('review_id'),
                                    title__id=self.kwargs.get('title_id'))
         return review.comments.all()
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminOrReadOnly, ])
+def api_categories(request):
+    if request.method == 'POST':
+        serializer = CategoriesSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    categories = Categories.objects.all()
+    serializer = CategoriesSerializer(categories, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAdmin, ])
+def api_destroy_category(request, slug):
+    category = get_object_or_404(Categories, slug=slug)
+    category.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

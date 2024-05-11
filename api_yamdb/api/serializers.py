@@ -1,8 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from rest_framework import serializers
-from reviews.models import Comment, Review
+from reviews.models import Comment, Review, Categories
 
 User = get_user_model()
 
@@ -74,3 +73,13 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         fields = ('id', 'text', 'author', 'pub_date')
         model = Comment
+
+
+class CategoriesSerializer(serializers.ModelSerializer):
+    slug = serializers.SlugField(
+        max_length=50,
+        validators=[UniqueValidator(queryset=Categories.objects.all())])
+
+    class Meta:
+        model = Categories
+        fields = ('name', 'slug')
