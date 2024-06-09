@@ -61,6 +61,7 @@ class Test04TitleAPI:
             f'Если POST-запрос администратора к `{self.TITLES_URL}` '
             'содержит корректные данные - должен вернуться ответ со статусом '
             '201.'
+            f'{response.json()}'
         )
         title_count += 1
 
@@ -83,6 +84,8 @@ class Test04TitleAPI:
             f'`{self.TITLES_URL}` в ответе возвращаются данные созданного '
             'объекта. Сейчас поле `id` отсутствует или не является целым '
             'числом.'
+            f'{response}'
+            f'{response.json()}'
         )
 
         response = client.get(self.TITLES_URL)
@@ -124,6 +127,7 @@ class Test04TitleAPI:
             f'`{self.TITLES_URL}` в ответе содержится список жанров для '
             'каждого произведения. Сейчас поле `genres` для элементов списка '
             '`results` отсутствует или содержит некорректное значение.'
+            f'{title}'
         )
         assert title.get('year') == post_data_1['year'], (
             'Проверьте, что при GET-запросе неавторизованного пользователя к '

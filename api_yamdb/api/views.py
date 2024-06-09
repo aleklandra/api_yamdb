@@ -3,21 +3,23 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
-from rest_framework import filters, status
+from rest_framework import filters, status, mixins
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_simplejwt.tokens import AccessToken
-from reviews.models import Review, Title, Categories
+from reviews.models import Review, Title, Categories, Genre
 
 from .permissions import (IsAdmin, IsAuthorAdminModeratorOrReadOnly,
                           IsAdminOrReadOnly)
 from .serializers import (ConfirmationCodeSerializer, UserCreationSerializer,
                           UserSerializer, ConfirmationCodeSerializer,
                           MeSerializer, CommentSerializer, ReviewSerializer,
-                          CategoriesSerializer)
+                          CategoriesSerializer, GenreSerializer,
+                          TitleSerializer, TitleListSerializer)
 
 User = get_user_model()
 
@@ -27,37 +29,23 @@ User = get_user_model()
 def send_confirmation_code(request):
 
     serializer = UserCreationSerializer(data=request.data)
-    email = serializer.initial_data['email']
-    username = serializer.initial_data['username']
-    user = User.objects.get(email=email, username=username)
-    if user is not None:
-        confirmation_code = default_token_generator.make_token(user)
+    serializer.is_valid(raise_exception=True)
+    email = serializer.data['email']
+    username = serializer.data['username']
+    user, created = User.objects.get_or_create(email=email,
+                                               username=username)
 
-        send_mail(
-            'Код подтверждения',
-            f'Ваш код подтверждения: {confirmation_code}',
-            settings.DEFAULT_FROM_EMAIL,
-            [email],
-            fail_silently=False
-        )
-        return Response(serializer.initial_data, status=status.HTTP_200_OK)
-    else:
-        serializer.is_valid(raise_exception=True)
-        email = serializer.data['email']
-        username = serializer.data['username']
-        user, created = User.objects.get_or_create(email=email, username=username)
+    confirmation_code = default_token_generator.make_token(user)
 
-        confirmation_code = default_token_generator.make_token(user)
+    send_mail(
+        'Код подтверждения',
+        f'Ваш код подтверждения: {confirmation_code}',
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        fail_silently=False
+    )
 
-        send_mail(
-            'Код подтверждения',
-            f'Ваш код подтверждения: {confirmation_code}',
-            settings.DEFAULT_FROM_EMAIL,
-            [email],
-            fail_silently=False
-        )
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -121,6 +109,7 @@ class ReviewViewSet(ModelViewSet):
     def get_queryset(self):
         title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
         reviews = title.reviews.all()
+        print(list(reviews))
         return reviews
 
     def perform_create(self, serializer):
@@ -145,23 +134,57 @@ class CommentViewSet(ModelViewSet):
         return review.comments.all()
 
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsAdminOrReadOnly, ])
-def api_categories(request):
-    if request.method == 'POST':
-        serializer = CategoriesSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    categories = Categories.objects.all()
-    serializer = CategoriesSerializer(categories, many=True)
-    return Response(serializer.data)
+class CategoriesViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
+                        mixins.DestroyModelMixin, GenericViewSet):
+    queryset = Categories.objects.all()
+    serializer_class = CategoriesSerializer
+    permission_classes = (IsAdminOrReadOnly,)
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ('name',)
+
+    def destroy(self, request, pk):
+        category = get_object_or_404(Categories, slug=pk)
+        category.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(['DELETE'])
-@permission_classes([IsAdmin, ])
-def api_destroy_category(request, slug):
-    category = get_object_or_404(Categories, slug=slug)
-    category.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+class GenreViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
+                   mixins.DestroyModelMixin, GenericViewSet):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+    permission_classes = (IsAdminOrReadOnly,)
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ('name',)
+
+    def destroy(self, request, pk):
+        category = get_object_or_404(Genre, slug=pk)
+        category.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TitleViewSet(ModelViewSet):
+    permission_classes = (IsAdminOrReadOnly, )
+    http_method_names = ('get', 'post', 'patch', 'delete')
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ('year', 'name', )
+
+    def get_serializer_class(self):
+        if self.action in ('list', 'retrieve'):
+            return TitleListSerializer
+        return TitleSerializer
+
+    def get_queryset(self):
+        queryset = Title.objects.all()
+        genre = self.request.query_params.get('genre')
+        category = self.request.query_params.get('category')
+        if genre is not None and category is not None:
+            queryset = (queryset.select_related('category')
+                        .prefetch_related('genre')
+                        .filter(genre__slug=genre, category__slug=category))
+        elif genre is not None:
+            queryset = (queryset.prefetch_related('genre')
+                        .filter(genre__slug=genre, ))
+        elif category is not None:
+            queryset = (queryset.select_related('category')
+                        .filter(category__slug=category, ))
+        return queryset
