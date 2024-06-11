@@ -1,7 +1,17 @@
+from datetime import date
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+
+
+class BaseModel(models.Model):
+    name = models.CharField(max_length=256)
+    slug = models.SlugField(unique=True, max_length=50)
+
+    class Meta:
+        abstract = True
+        ordering = ('name', )
 
 
 class User(AbstractUser):
@@ -21,18 +31,14 @@ class User(AbstractUser):
     is_staff = models.CharField(null=True, max_length=256)
 
 
-class Categories(models.Model):
-    name = models.CharField(max_length=256)
-    slug = models.SlugField(unique=True, max_length=50)
+class Categories(BaseModel):
 
     class Meta:
         verbose_name = 'Категория'
         verbose_name_plural = 'Категории'
 
 
-class Genre(models.Model):
-    name = models.CharField(max_length=256)
-    slug = models.SlugField(unique=True, max_length=50)
+class Genre(BaseModel):
 
     class Meta:
         verbose_name = 'Жанр'
@@ -41,17 +47,20 @@ class Genre(models.Model):
 
 class Title(models.Model):
     name = models.TextField(verbose_name='Название', max_length=256)
-    year = models.IntegerField(verbose_name='Год выпуска')
+    year = models.IntegerField(verbose_name='Год выпуска',
+                               validators=[
+                                   MaxValueValidator(date.today().year)])
     description = models.TextField(verbose_name='Описание', max_length=256,
                                    null=True)
     genre = models.ManyToManyField(Genre, through='GenreTitle')
     category = models.ForeignKey(Categories, related_name='title',
-                                 on_delete=models.SET_DEFAULT,
-                                 default=0)
+                                 on_delete=models.SET_NULL,
+                                 null=True)
 
     class Meta:
         verbose_name = 'Произведение'
         verbose_name_plural = 'Произведения'
+        ordering = ('name', )
 
 
 class Review(models.Model):

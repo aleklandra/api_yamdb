@@ -1,7 +1,7 @@
-id,username,password,email,role,bio,first_name,last_name,is_superuser,is_active,date_joined
-100,bingobongo,123,bingobongo@yamdb.fake,user,,,,0,1,9/05/2024
-101,capt_obvious,123,capt_obvious@yamdb.fake,admin,,,1,1,1,9/05/2024
-102,faust,123,faust@yamdb.fake,user,,,,0,1,9/05/2024
-103,reviewer,123,reviewer@yamdb.fake,user,,,,0,1,9/05/2024
-104,angry,123,angry@yamdb.fake,moderator,,,,0,1,9/05/2024
-105,angry3,123,alek@yamdb.fake,admin,,,,0,1,9/05/2024
+id,username,password,email,role,bio,first_name,last_name,is_superuser,is_active
+100,bingobongo,123,bingobongo@yamdb.fake,user,,,,0,1
+101,capt_obvious,123,capt_obvious@yamdb.fake,admin,,,1,1,1
+102,faust,123,faust@yamdb.fake,user,,,,0,1
+103,reviewer,123,reviewer@yamdb.fake,user,,,,0,1
+104,angry,123,angry@yamdb.fake,moderator,,,,0,1
+105,angry3,123,alek@yamdb.fake,admin,,,,0,1
