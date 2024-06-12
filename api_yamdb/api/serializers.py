@@ -211,7 +211,7 @@ class TitleSerializer(serializers.ModelSerializer):
         raiting_count = (Title.objects
                          .filter(id=obj.pk)
                          .annotate(score_avg=Avg('reviews__score')))
-        if list(raiting_count) == []:
+        if raiting_count.count() == 0:
             return None
         else:
             return list(raiting_count)[0].score_avg
