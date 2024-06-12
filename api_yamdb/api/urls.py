@@ -14,8 +14,8 @@ v1_router.register(r'titles/(?P<title_id>\d+)/reviews', ReviewViewSet,
 v1_router.register(
     r'titles/(?P<title_id>\d+)/reviews/(?P<review_id>\d+)/comments',
     CommentViewSet, basename='comments')
-v1_router.register('categories', CategoriesViewSet)
-v1_router.register('genres', GenreViewSet)
+v1_router.register('categories', CategoriesViewSet, basename='categories')
+v1_router.register('genres', GenreViewSet, basename='genres')
 v1_router.register('titles', TitleViewSet, basename='titles')
 
 v1_auth_patterns = [

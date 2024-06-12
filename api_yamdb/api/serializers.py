@@ -117,7 +117,6 @@ class GenreSerializer(serializers.ModelSerializer):
 class GenreConvertSerializer(serializers.ListField):
 
     def to_representation(self, value):
-        print(value)
         genres = []
         if value is None:
             return None
@@ -129,7 +128,6 @@ class GenreConvertSerializer(serializers.ListField):
             return genres
 
     def to_internal_value(self, data):
-        print(data)
         genres = []
         for g in data:
             try:
@@ -138,7 +136,6 @@ class GenreConvertSerializer(serializers.ListField):
             except Genre.DoesNotExist:
                 raise serializers.ValidationError(f'{g} - такого жанра '
                                                   f'не существует')
-        print(genres)
         return genres
 
 
@@ -182,6 +179,22 @@ class TitleListSerializer(serializers.ModelSerializer):
 
 
 class TitleSerializer(serializers.ModelSerializer):
+
+    # Это серилизатор для создания новых объектов Title,
+    # тут поле genre не read_only -
+    # оно обязательное для создания объекта Title
+    # Использую здесь GenreConvertSerializer вместо  GenreSerializer потому,
+    # что при создании нового объекта Title в запросе api
+    # поступает список genre, состоящий только из параметров slug.
+    # Поле name в этом списке отсутсвует,
+    # а GenreSerializer не хочет работать
+    # без поля name. Если использую
+    # genre = GenreSerializer(many=True, read_only=True)
+    # метод POST не работает.
+    # В пачке мне посоветовали переписать метод to_representation,
+    # что я и сделала в GenreConvertSerializer
+    # Аналогично с CategoriesSerializer
+
     genre = GenreConvertSerializer()
     name = serializers.CharField(required=True, max_length=256)
     year = serializers.IntegerField(required=True)

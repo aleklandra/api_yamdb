@@ -1,6 +1,4 @@
 import csv
-import sqlite3
-import os
 from django.core.management.base import BaseCommand
 from pathlib import Path
 from api_yamdb import settings

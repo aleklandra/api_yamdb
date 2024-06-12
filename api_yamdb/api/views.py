@@ -7,19 +7,20 @@ from rest_framework import filters, status, mixins
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_simplejwt.tokens import AccessToken
 from reviews.models import Review, Title, Categories, Genre
 
-from .permissions import (IsAdmin, IsAuthorAdminModeratorOrReadOnly,
-                          IsAdminOrReadOnly)
-from .serializers import (ConfirmationCodeSerializer, UserCreationSerializer,
-                          UserSerializer, ConfirmationCodeSerializer,
-                          MeSerializer, CommentSerializer, ReviewSerializer,
-                          CategoriesSerializer, GenreSerializer,
-                          TitleSerializer, TitleListSerializer)
+from api.permissions import (IsAdmin, IsAuthorAdminModeratorOrReadOnly,
+                             IsAdminOrReadOnly)
+from api.serializers import (ConfirmationCodeSerializer,
+                             UserCreationSerializer,
+                             UserSerializer, ConfirmationCodeSerializer,
+                             MeSerializer, CommentSerializer, ReviewSerializer,
+                             CategoriesSerializer, GenreSerializer,
+                             TitleSerializer, TitleListSerializer)
+from api.filters import TitleFilter
 
 User = get_user_model()
 
@@ -107,9 +108,8 @@ class ReviewViewSet(ModelViewSet):
     http_method_names = ('get', 'post', 'patch', 'delete')
 
     def get_queryset(self):
-        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
-        reviews = title.reviews.all()
-        print(list(reviews))
+        reviews = (get_object_or_404(Title, id=self.kwargs.get('title_id'))
+                   .reviews.all())
         return reviews
 
     def perform_create(self, serializer):
@@ -142,6 +142,12 @@ class CategoriesViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
     filter_backends = (filters.SearchFilter,)
     search_fields = ('name',)
 
+# Пришлось переопределить метод destroy,
+# так как удаление нужно делать
+# по параметру slug, а не pk
+# После того, как убрала переопределение destroy,
+# упал автотест на проверку удаления
+
     def destroy(self, request, pk):
         category = get_object_or_404(Categories, slug=pk)
         category.delete()
@@ -156,6 +162,12 @@ class GenreViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
     filter_backends = (filters.SearchFilter,)
     search_fields = ('name',)
 
+# Пришлось переопределить метод destroy,
+# так как удаление нужно делать
+# по параметру slug, а не pk
+# После того, как убрала переопределение destroy,
+# упал автотест на проверку удаления
+
     def destroy(self, request, pk):
         category = get_object_or_404(Genre, slug=pk)
         category.delete()
@@ -163,28 +175,12 @@ class GenreViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
 
 class TitleViewSet(ModelViewSet):
+    queryset = Title.objects.all()
     permission_classes = (IsAdminOrReadOnly, )
     http_method_names = ('get', 'post', 'patch', 'delete')
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ('year', 'name', )
+    filterset_class = TitleFilter
 
     def get_serializer_class(self):
         if self.action in ('list', 'retrieve'):
             return TitleListSerializer
         return TitleSerializer
-
-    def get_queryset(self):
-        queryset = Title.objects.all()
-        genre = self.request.query_params.get('genre')
-        category = self.request.query_params.get('category')
-        if genre is not None and category is not None:
-            queryset = (queryset.select_related('category')
-                        .prefetch_related('genre')
-                        .filter(genre__slug=genre, category__slug=category))
-        elif genre is not None:
-            queryset = (queryset.prefetch_related('genre')
-                        .filter(genre__slug=genre, ))
-        elif category is not None:
-            queryset = (queryset.select_related('category')
-                        .filter(category__slug=category, ))
-        return queryset
